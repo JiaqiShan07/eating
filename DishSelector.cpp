@@ -6,7 +6,10 @@
 #include <sstream>
 #include <stdexcept>
 
-DishSelector::DishSelector() : gen(rd()) {}
+DishSelector::DishSelector()
+    : gen(static_cast<unsigned int>(std::time(nullptr))) {
+    // 使用当前时间作为种子初始化随机数生成器，增强随机性
+}
 
 bool DishSelector::loadDishesFromFile(const std::string& filename) {
     std::ifstream file(filename);
@@ -55,7 +58,12 @@ bool DishSelector::loadHistory() {
     history.clear();
     std::string line;
     std::time_t now = std::time(nullptr);
-    const int twoDaysInSeconds = 2 * 24 * 60 * 60;
+
+    // 获取当前日期
+    std::tm* now_tm = std::localtime(&now);
+    int now_day = now_tm->tm_mday;
+    int now_month = now_tm->tm_mon;
+    int now_year = now_tm->tm_year;
 
     while (std::getline(file, line)) {
         std::istringstream iss(line);
@@ -75,8 +83,44 @@ bool DishSelector::loadHistory() {
             // 更新菜品的eatenRecently属性
             for (auto& dish : dishes) {
                 if (dish.name == dishName) {
-                    dish.eatenRecently =
-                        ((now - entry.timestamp) < twoDaysInSeconds);
+                    // 获取历史记录的日期
+                    std::tm* entry_tm = std::localtime(&entry.timestamp);
+                    int entry_day = entry_tm->tm_mday;
+                    int entry_month = entry_tm->tm_mon;
+                    int entry_year = entry_tm->tm_year;
+
+                    // 计算日期差
+                    bool isRecent = false;
+
+                    // 如果是同一年同一月，直接比较日期差
+                    if (now_year == entry_year && now_month == entry_month) {
+                        isRecent = (now_day - entry_day < 2);
+                    }
+                    // 如果是同一年但不同月
+                    else if (now_year == entry_year &&
+                             now_month - entry_month == 1) {
+                        // 获取上个月的天数
+                        int days_in_entry_month;
+                        if (entry_month == 1) {  // 2月
+                            // 检查闰年
+                            bool is_leap_year = (entry_year % 4 == 0 &&
+                                                 entry_year % 100 != 0) ||
+                                                (entry_year % 400 == 0);
+                            days_in_entry_month = is_leap_year ? 29 : 28;
+                        } else if (entry_month == 3 || entry_month == 5 ||
+                                   entry_month == 8 || entry_month == 10) {
+                            days_in_entry_month = 30;
+                        } else {
+                            days_in_entry_month = 31;
+                        }
+
+                        // 如果日期差小于2天
+                        isRecent =
+                            ((days_in_entry_month - entry_day) + now_day < 2);
+                    }
+                    // 不考虑跨年的情况，默认跨年已经超过两天
+
+                    dish.eatenRecently = isRecent;
                     break;
                 }
             }
@@ -93,8 +137,44 @@ bool DishSelector::loadHistory() {
             // 更新菜品的eatenRecently属性
             for (auto& dish : dishes) {
                 if (dish.name == dishName) {
-                    dish.eatenRecently =
-                        ((now - entry.timestamp) < twoDaysInSeconds);
+                    // 获取历史记录的日期
+                    std::tm* entry_tm = std::localtime(&entry.timestamp);
+                    int entry_day = entry_tm->tm_mday;
+                    int entry_month = entry_tm->tm_mon;
+                    int entry_year = entry_tm->tm_year;
+
+                    // 计算日期差
+                    bool isRecent = false;
+
+                    // 如果是同一年同一月，直接比较日期差
+                    if (now_year == entry_year && now_month == entry_month) {
+                        isRecent = (now_day - entry_day < 2);
+                    }
+                    // 如果是同一年但不同月
+                    else if (now_year == entry_year &&
+                             now_month - entry_month == 1) {
+                        // 获取上个月的天数
+                        int days_in_entry_month;
+                        if (entry_month == 1) {  // 2月
+                            // 检查闰年
+                            bool is_leap_year = (entry_year % 4 == 0 &&
+                                                 entry_year % 100 != 0) ||
+                                                (entry_year % 400 == 0);
+                            days_in_entry_month = is_leap_year ? 29 : 28;
+                        } else if (entry_month == 3 || entry_month == 5 ||
+                                   entry_month == 8 || entry_month == 10) {
+                            days_in_entry_month = 30;
+                        } else {
+                            days_in_entry_month = 31;
+                        }
+
+                        // 如果日期差小于2天
+                        isRecent =
+                            ((days_in_entry_month - entry_day) + now_day < 2);
+                    }
+                    // 不考虑跨年的情况，默认跨年已经超过两天
+
+                    dish.eatenRecently = isRecent;
                     break;
                 }
             }
@@ -150,12 +230,54 @@ void DishSelector::saveHistory(const std::string& dishName) {
 
 bool DishSelector::isDishSelectedRecently(const std::string& dishName) const {
     std::time_t now = std::time(nullptr);
-    const int twoDaysInSeconds = 2 * 24 * 60 * 60;
+
+    // 获取当前日期
+    std::tm* now_tm = std::localtime(&now);
+    int now_day = now_tm->tm_mday;
+    int now_month = now_tm->tm_mon;
+    int now_year = now_tm->tm_year;
 
     for (const auto& entry : history) {
-        if (entry.dishName == dishName &&
-            (now - entry.timestamp) < twoDaysInSeconds) {
-            return true;
+        if (entry.dishName == dishName) {
+            // 获取历史记录的日期
+            std::tm* entry_tm = std::localtime(&entry.timestamp);
+            int entry_day = entry_tm->tm_mday;
+            int entry_month = entry_tm->tm_mon;
+            int entry_year = entry_tm->tm_year;
+
+            // 计算日期差
+            // 如果是同一年同一月，直接比较日期差
+            if (now_year == entry_year && now_month == entry_month) {
+                if (now_day - entry_day < 2) {
+                    return true;
+                }
+            }
+            // 如果是同一年但不同月
+            else if (now_year == entry_year) {
+                // 处理月份交界的情况
+                if (now_month - entry_month == 1) {
+                    // 获取上个月的天数
+                    int days_in_entry_month;
+                    if (entry_month == 1) {  // 2月
+                        // 检查闰年
+                        bool is_leap_year =
+                            (entry_year % 4 == 0 && entry_year % 100 != 0) ||
+                            (entry_year % 400 == 0);
+                        days_in_entry_month = is_leap_year ? 29 : 28;
+                    } else if (entry_month == 3 || entry_month == 5 ||
+                               entry_month == 8 || entry_month == 10) {
+                        days_in_entry_month = 30;
+                    } else {
+                        days_in_entry_month = 31;
+                    }
+
+                    // 如果日期差小于2天
+                    if ((days_in_entry_month - entry_day) + now_day < 2) {
+                        return true;
+                    }
+                }
+            }
+            // 不考虑跨年的情况，默认跨年已经超过两天
         }
     }
     return false;
